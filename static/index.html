@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GF Drop</title>
+<style>
+:root{--bg:#07080a;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.1);--tx:#eceff3;--mut:#8b93a1;--sv:#c9d1dc;--ok:#7be0a5;--bad:#ff7a7a}
+*{box-sizing:border-box;margin:0}
+body{background:radial-gradient(1000px 600px at 70% -10%,#1b1f27,var(--bg));color:var(--tx);font:15px -apple-system,"Segoe UI",Inter,sans-serif;height:100vh;display:flex;overflow:hidden}
+#fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+aside{z-index:1;width:230px;padding:22px 14px;border-right:1px solid var(--line);background:rgba(10,11,14,.7);backdrop-filter:blur(20px);display:flex;flex-direction:column;gap:6px}
+.logo{display:flex;align-items:center;gap:10px;padding:0 8px 18px;font-weight:700;letter-spacing:3px}
+.logo img{height:38px;max-width:150px;object-fit:contain}
+nav button{all:unset;cursor:pointer;display:block;width:100%;padding:11px 14px;border-radius:12px;color:var(--mut);transition:.2s}
+nav button:hover{background:var(--card);color:var(--tx);transform:translateX(3px)}
+nav button.on{background:linear-gradient(135deg,rgba(201,209,220,.18),rgba(201,209,220,.04));color:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+main{z-index:1;flex:1;overflow:auto;padding:28px 34px}
+section{display:none;animation:in .35s ease}section.on{display:block}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+h2{font-weight:600;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;backdrop-filter:blur(16px);margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.drop{border:2px dashed rgba(201,209,220,.3);border-radius:22px;padding:46px 20px;text-align:center;transition:.25s}
+.drop.over{border-color:var(--sv);box-shadow:0 0 40px rgba(201,209,220,.25);transform:scale(1.01)}
+.btn{cursor:pointer;border:0;border-radius:14px;padding:12px 22px;font:inherit;font-weight:600;color:#0b0c0f;background:linear-gradient(135deg,#f4f6f9,#a9b2bf);transition:.2s;margin:6px 4px}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(201,209,220,.25)}
+.btn.g{background:var(--card);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line)}
+.bar{height:8px;border-radius:9px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b93a1,#fff);transition:width .2s}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.row .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row img{width:42px;height:42px;object-fit:cover;border-radius:9px}
+.mut{color:var(--mut);font-size:13px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);margin-right:8px;animation:p 2s infinite}
+.dot.off{background:var(--bad);box-shadow:0 0 10px var(--bad)}@keyframes p{50%{opacity:.4}}
+#qr{background:#fff;border-radius:16px;padding:10px;width:200px;margin:0 auto}#qr svg,#qr img{width:100%;display:block}
+.tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;background:var(--card);border:1px solid var(--line)}
+.tag.ok{color:var(--ok)}
+#toast{position:fixed;right:20px;bottom:20px;z-index:9;display:flex;flex-direction:column;gap:8px}
+#toast div{background:rgba(25,27,32,.95);border:1px solid var(--line);padding:12px 18px;border-radius:14px;animation:in .3s}
+@media(max-width:800px){body{flex-direction:column-reverse}aside{width:100%;flex-direction:row;padding:8px;overflow-x:auto;border:0;border-top:1px solid var(--line)}.logo{display:none}nav{display:flex;gap:4px}nav button{white-space:nowrap;padding:10px 12px}main{padding:18px 16px}.grid{grid-template-columns:1fr}}
+</style></head><body>
+<canvas id="fx"></canvas>
+<aside>
+ <div class="logo"><img src="/static/logo.png" alt="GF DROP" onerror="this.replaceWith('GF DROP')"></div>
+ <nav id="nav"></nav>
+</aside>
+<main>
+<section id="home" class="on">
+ <h2 data-t="home"></h2>
+ <div class="grid"><div>
+  <div class="card drop" id="dz1"><div style="font-size:42px">⇪</div><p data-t="drag"></p>
+   <button class="btn" onclick="pick()" data-t="send"></button><button class="btn g" onclick="go('receive')" data-t="recv"></button></div>
+  <div class="card" id="prog" style="display:none"><b id="pn"></b><div class="bar"><i id="pb"></i></div><span class="mut" id="ps"></span></div>
+ </div><div>
+  <div class="card" style="text-align:center"><div><span class="dot" id="st"></span><span id="stt"></span></div><p class="mut" data-t="slogan" style="margin:6px 0 14px"></p>
+   <div id="qr"></div><p class="mut" id="qrh" style="margin-top:10px" data-t="qrh"></p></div>
+ </div></div>
+</section>
+<section id="send"><h2 data-t="sendf"></h2><div class="card drop" id="dz2"><p data-t="drag"></p><button class="btn" onclick="pick()" data-t="choose"></button></div></section>
+<section id="receive"><h2 data-t="recvf"></h2><div class="card" id="rl"></div><button class="btn g" id="ofb" onclick="api('/api/open-folder','POST')" data-t="openf"></button></section>
+<section id="devices"><h2 data-t="devs"></h2><div class="card" id="dl"></div></section>
+<section id="history"><h2 data-t="hist"></h2><div class="card" id="hl"></div></section>
+<section id="settings"><h2 data-t="sets"></h2>
+ <div class="card"><b data-t="lang"></b><br><button class="btn g" onclick="setLang('tr')">Türkçe</button><button class="btn g" onclick="setLang('en')">English</button></div>
+ <div class="card host"><b data-t="upd"></b> <span class="tag">v<span id="ver"></span></span><p class="mut" id="um" style="margin:8px 0"></p><button class="btn g" onclick="chk()" data-t="chk"></button><button class="btn" id="ub" style="display:none" onclick="applyUpd()" data-t="inst"></button></div>
+ <div class="card host"><b>Discord</b> <span class="tag" id="dc"></span><p class="mut" id="dm" style="margin:8px 0"></p><button class="btn g" id="dlog" onclick="location='/auth/discord'" data-t="dlog"></button><button class="btn g" id="dinv" onclick="window.open(INFO.invite)" data-t="dinv"></button></div>
+ <div class="card host"><b data-t="pair"></b><p class="mut" data-t="pairh" style="margin:8px 0"></p><button class="btn g" onclick="repair()" data-t="reset"></button></div>
+</section>
+<section id="about"><h2>GF DROP</h2><div class="card"><p>Transfer Without Limits.</p><p class="mut" data-t="abt"></p></div></section>
+</main>
+<div id="toast"></div><input type="file" id="fi" multiple hidden>
+<script>
+const $=s=>document.querySelector(s),T={tr:{home:"Ana Sayfa",send:"DOSYA GÖNDER",recv:"DOSYA AL",sendf:"Dosya Gönder",recvf:"Dosya Al",devs:"Bağlı Cihazlar",hist:"Aktarım Geçmişi",sets:"Ayarlar",abt:"GF Drop hakkında",drag:"Dosyaları buraya sürükle",choose:"Dosya seç",slogan:"Transfer Without Limits.",qrh:"Telefonla tara, aynı Wi-Fi'de bağlan",openf:"Klasörü aç",lang:"Dil",upd:"Güncelleme",chk:"Güncellemeyi denetle",inst:"İndir ve yükle",dlog:"Discord ile doğrula",dinv:"Sunucuya katıl",pair:"Eşleşme",pairh:"Tüm cihazların eşleşmesini sıfırlar, yeni QR üretir.",reset:"Eşleşmeleri sıfırla",on:"Bağlı",off:"Bağlantı yok",none:"Henüz bir şey yok",ok:"Aktarıldı: ",ver:"Doğrulanmış üye",unv:"Doğrulanmadı",ncfg:"Discord ayarı yok (config.json)",rep:"github_repo ayarlanmamış (config.json)",lat:"Güncelsin",newv:"Yeni sürüm: ",abt:"GF Drop; aynı ağdaki cihazlar arasında dosya aktarır. Dosyalar internete çıkmaz.",nav:["Ana Sayfa","Dosya Gönder","Dosya Al","Bağlı Cihazlar","Geçmiş","Ayarlar","Hakkında"]},
+en:{home:"Home",send:"SEND FILE",recv:"RECEIVE FILE",sendf:"Send Files",recvf:"Receive Files",devs:"Connected Devices",hist:"Transfer History",sets:"Settings",abt:"About GF Drop",drag:"Drag files here",choose:"Choose files",slogan:"Transfer Without Limits.",qrh:"Scan with your phone on the same Wi-Fi",openf:"Open folder",lang:"Language",upd:"Update",chk:"Check for updates",inst:"Download & install",dlog:"Verify with Discord",dinv:"Join server",pair:"Pairing",pairh:"Resets all pairings and creates a new QR.",reset:"Reset pairings",on:"Connected",off:"Disconnected",none:"Nothing yet",ok:"Transferred: ",ver:"Verified member",unv:"Not verified",ncfg:"Discord not configured (config.json)",rep:"github_repo not set (config.json)",lat:"Up to date",newv:"New version: ",abt:"GF Drop moves files between devices on the same network. Files never leave your LAN.",nav:["Home","Send Files","Receive Files","Connected Devices","History","Settings","About"]}};
+let L=localStorage.lang||"tr",INFO={},UPD=null;const V=["home","send","receive","devices","history","settings","about"];
+const t=k=>T[L][k]||k,sz=b=>b>1e9?(b/1e9).toFixed(2)+" GB":b>1e6?(b/1e6).toFixed(1)+" MB":(b/1e3|0)+" KB";
+const toast=m=>{const d=document.createElement("div");d.textContent=m;$("#toast").append(d);setTimeout(()=>d.remove(),3500)};
+const api=(u,m="GET",b)=>fetch(u,{method:m,headers:b?{"Content-Type":"application/json"}:{},body:b&&JSON.stringify(b)}).then(r=>r.json());
+function setLang(l){L=l;localStorage.lang=l;document.documentElement.lang=l;document.querySelectorAll("[data-t]").forEach(e=>e.textContent=t(e.dataset.t));$("#nav").innerHTML=V.map((v,i)=>`<button data-v="${v}" onclick="go('${v}')">${T[L].nav[i]}</button>`).join("");go(cur);dcUI()}
+let cur="home";function go(v){cur=v;document.querySelectorAll("section").forEach(s=>s.classList.toggle("on",s.id==v));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v==v));if(v=="receive")loadFiles();if(v=="history")loadHist()}
+function pick(){$("#fi").click()}$("#fi").onchange=e=>send([...e.target.files]);
+for(const id of["dz1","dz2"]){const z=$("#"+id);z.ondragover=e=>{e.preventDefault();z.classList.add("over")};z.ondragleave=()=>z.classList.remove("over");z.ondrop=e=>{e.preventDefault();z.classList.remove("over");send([...e.dataTransfer.files])}}
+function send(fs){if(!fs.length)return;go("home");(function next(i){if(i>=fs.length)return;const f=fs[i],fd=new FormData();fd.append("file",f);const x=new XMLHttpRequest(),t0=Date.now();
+ $("#prog").style.display="block";$("#pn").textContent=f.name;
+ x.upload.onprogress=e=>{if(!e.lengthComputable)return;const s=(Date.now()-t0)/1e3,sp=e.loaded/1048576/s,eta=sp?(e.total-e.loaded)/1048576/sp:0;$("#pb").style.width=e.loaded/e.total*100+"%";$("#ps").textContent=`${sp.toFixed(1)} MB/s · ${Math.ceil(eta)} s · ${sz(e.loaded)} / ${sz(e.total)}`};
+ x.onload=()=>{x.status==200?toast(t("ok")+f.name):toast(x.status==403?"Discord!":"Error "+x.status);$("#pb").style.width="0";next(i+1)};x.onerror=()=>toast("Error");x.open("POST","/api/upload");x.send(fd)})(0)}
+async function loadFiles(){const d=await api("/api/files"),box=INFO.host?"inbox":"outbox",l=d[box];
+ $("#rl").innerHTML=l.length?l.map(f=>`<div class="row">${/\.(png|jpe?g|gif|webp)$/i.test(f.name)?`<img src="/files/${box}/${encodeURIComponent(f.name)}">`:"<span style='font-size:26px'>📄</span>"}<span class="n">${f.name}</span><span class="mut">${sz(f.size)}</span><a class="btn g" href="/files/${box}/${encodeURIComponent(f.name)}?dl=1">⬇</a>${INFO.host?`<button class="btn g" onclick="del('${box}','${f.name}')">✕</button>`:""}</div>`).join(""):`<p class="mut">${t("none")}</p>`}
+async function del(b,n){await api(`/api/files/${b}/${encodeURIComponent(n)}`,"DELETE");loadFiles()}
+async function loadHist(){const h=await api("/api/history");$("#hl").innerHTML=h.length?h.map(x=>`<div class="row"><span>${{sent:"⬆",received:"⬇",downloaded:"⬇"}[x.dir]}</span><span class="n">${x.name}</span><span class="mut">${x.dev} · ${sz(x.size)}${x.mbs?" · "+x.mbs+" MB/s":""} · ${new Date(x.t*1e3).toLocaleString()}</span></div>`).join(""):`<p class="mut">${t("none")}</p>`}
+async function tick(){try{const r=await api("/api/ping","POST");$("#st").className="dot";$("#stt").textContent=t("on");
+ $("#dl").innerHTML=r.devices.length?r.devices.map(d=>`<div class="row"><span style="font-size:24px">${{iPhone:"📱",Android:"📱",Mac:"💻",Windows:"🖥"}[d.type]||"📟"}</span><span class="n">${d.name}</span><span class="tag ${d.online?"ok":""}">${d.online?t("on"):t("off")}</span></div>`).join(""):`<p class="mut">${t("none")}</p>`}catch{$("#st").className="dot off";$("#stt").textContent=t("off")}}
+function dcUI(){const d=INFO.discord||{};$("#dc").textContent=d.verified?"✔ "+t("ver")+" ("+d.user+")":t("unv");$("#dc").className="tag"+(d.verified?" ok":"");$("#dm").textContent=INFO.dc_ready?"":t("ncfg");$("#dlog").style.display=INFO.dc_ready?"":"none";$("#dinv").style.display=INFO.invite?"":"none"}
+async function chk(){const r=await api("/api/update/check");UPD=r;$("#um").textContent=r.status=="new"?t("newv")+r.latest:r.status=="no_repo"?t("rep"):r.status=="latest"?t("lat"):r.msg;$("#ub").style.display=r.status=="new"?"":"none"}
+async function applyUpd(){const r=await api("/api/update/apply","POST",{url:UPD.url});if(r.status!="restarting")toast(r.status)}
+async function repair(){await api("/api/repair","POST");qr();toast("OK")}
+function qr(){const q=$("#qr");q.innerHTML=INFO.host&&INFO.qr?`<img src="/api/qr?${Date.now()}">`:"";q.style.display=q.innerHTML?"":"none";$("#qrh").style.display=q.innerHTML?"":"none"}
+(async()=>{INFO=await api("/api/info");$("#ver").textContent=INFO.version;if(!INFO.host){$("#ofb").style.display="none";document.querySelectorAll(".host").forEach(e=>e.style.display="none")}
+ setLang(L);qr();tick();setInterval(tick,5000)})();
+// gumus parcacik animasyonu
+const c=$("#fx"),g=c.getContext("2d");let P=[];function rs(){c.width=innerWidth;c.height=innerHeight;P=Array.from({length:50},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.6+.4,v:Math.random()*.3+.1}))}rs();onresize=rs;
+(function a(){g.clearRect(0,0,c.width,c.height);g.fillStyle="rgba(201,209,220,.35)";for(const p of P){p.y-=p.v;if(p.y<0)p.y=c.height;g.beginPath();g.arc(p.x,p.y,p.r,0,7);g.fill()}requestAnimationFrame(a)})();
+</script></body></html>
