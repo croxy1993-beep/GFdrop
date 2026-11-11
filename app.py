@@ -1,5 +1,5 @@
 """GF Drop - PC tarafi (Flask). Telefon/Mac/iPhone tarayicidan QR ile baglanir."""
-import io, os, sys, json, time, socket, secrets, threading, subprocess, webbrowser
+import io, re, os, sys, json, time, socket, secrets, threading, subprocess, webbrowser
 from pathlib import Path
 import requests
 from flask import Flask, request, jsonify, send_from_directory, redirect, abort, Response
@@ -9,7 +9,7 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))  # paketlenmis dosyalar
 DATA = Path.home() / "GFDrop"
 BOX = {"inbox": DATA / "inbox", "outbox": DATA / "outbox"}  # inbox: PC'ye gelen, outbox: PC'nin sundugu
@@ -26,7 +26,9 @@ else:
     CFG_F.write_text(json.dumps(CFG, indent=2), "utf-8")
 
 TOKEN = secrets.token_urlsafe(8)   # QR eslesme anahtari
-DEVICES, DISCORD = {}, {"user": None, "verified": False}
+DISCORD_F = DATA / "discord.json"   # Discord girisi yeniden acilista da kalsin
+DEVICES = {}
+DISCORD = json.loads(DISCORD_F.read_text("utf-8")) if DISCORD_F.exists() else {"user": None, "verified": False, "avatar": None}
 HIST_F = DATA / "history.json"
 HIST = json.loads(HIST_F.read_text("utf-8")) if HIST_F.exists() else []
 app = Flask(__name__, static_folder=str(BASE / "static"), static_url_path="/static")
@@ -42,7 +44,9 @@ def lan_ip():
 
 
 def is_host():
-    return request.remote_addr in ("127.0.0.1", "::1")
+    # Cloudflare tuneli istekleri localhost'tan iletir; bu basliklar varsa istek internetten gelmistir
+    proxied = any(h in request.headers for h in ("Cf-Connecting-Ip", "X-Forwarded-For", "Cf-Ray"))
+    return request.remote_addr in ("127.0.0.1", "::1") and not proxied
 
 
 def log(name, size, direction, secs=0):
@@ -84,7 +88,8 @@ def info():
 def qr():
     if not (is_host() and qrcode):
         abort(404)
-    url = f"http://{lan_ip()}:{CFG['port']}/?t={TOKEN}"
+    base = TUN["url"] if TUN["state"] == "on" else f"http://{lan_ip()}:{CFG['port']}"
+    url = f"{base}/?t={TOKEN}"
     b = io.BytesIO()
     qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=10).save(b)
     return Response(b.getvalue(), mimetype="image/svg+xml", headers={"X-Url": url})
@@ -195,7 +200,7 @@ def upd_apply():
     bat = DATA / "upd.bat"  # eski exe kapaninca yenisiyle degistir, yeniden baslat
     bat.write_text(f'@echo off\ntimeout /t 2 >nul\nmove /y "{new}" "{cur}"\nstart "" "{cur}"\ndel "%~f0"\n')
     subprocess.Popen(["cmd", "/c", str(bat)], creationflags=0x00000008)
-    threading.Timer(0.5, lambda: os._exit(0)).start()
+    threading.Timer(0.5, _quit).start()
     return jsonify(status="restarting")
 
 
@@ -224,8 +229,82 @@ def dc_cb():
     h = {"Authorization": f"Bearer {tok.get('access_token')}"}
     me = requests.get("https://discord.com/api/users/@me", headers=h, timeout=10).json()
     gs = requests.get("https://discord.com/api/users/@me/guilds", headers=h, timeout=10).json()
-    DISCORD.update(user=me.get("username"), verified=any(g["id"] == c["guild_id"] for g in gs))
+    av = me.get("avatar")
+    DISCORD.update(user=me.get("global_name") or me.get("username"),
+                   verified=any(g["id"] == c["guild_id"] for g in gs),
+                   avatar=f"https://cdn.discordapp.com/avatars/{me['id']}/{av}.png?size=128" if av else None)
+    DISCORD_F.write_text(json.dumps(DISCORD), "utf-8")
     return redirect("/")
+
+
+@app.route("/api/discord/logout", methods=["POST"])
+def dc_logout():
+    if not is_host():
+        abort(403)
+    DISCORD.update(user=None, verified=False, avatar=None)
+    DISCORD_F.write_text(json.dumps(DISCORD), "utf-8")
+    return jsonify(ok=True)
+
+
+# ---- internet modu: Cloudflare gecici tuneli (hesap gerekmez) ----
+TUN = {"state": "off", "url": "", "proc": None, "msg": ""}
+CF = DATA / "cloudflared.exe"
+
+
+def _quit():  # cikarken tuneli de kapat
+    if TUN["proc"]:
+        TUN["proc"].terminate()
+    os._exit(0)
+
+
+def _tunnel_run():
+    try:
+        if not CF.exists():  # ilk seferde cloudflared'i indir (~30 MB)
+            u = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+            with requests.get(u, stream=True, timeout=60) as r:
+                r.raise_for_status()
+                with open(CF, "wb") as f:
+                    for ch in r.iter_content(1 << 16):
+                        f.write(ch)
+        p = subprocess.Popen([str(CF), "tunnel", "--url", f"http://127.0.0.1:{CFG['port']}", "--no-autoupdate",
+                              "--protocol", "http2"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                             creationflags=0x08000000 if os.name == "nt" else 0)
+        TUN["proc"] = p
+        for line in p.stdout:
+            m = re.search(r"https://[a-z0-9-]+\.trycloudflare\.com", line)
+            if m:
+                TUN.update(state="on", url=m.group(0))
+        if TUN["state"] != "off":
+            TUN.update(state="error", msg="Tunel kapandi")
+    except Exception as e:
+        TUN.update(state="error", msg=str(e))
+
+
+@app.route("/api/tunnel", methods=["GET", "POST"])
+def tunnel():
+    if not is_host():
+        abort(403)
+    if request.method == "POST":
+        if request.json.get("on"):
+            if TUN["state"] in ("off", "error"):
+                TUN.update(state="starting", url="", msg="")
+                threading.Thread(target=_tunnel_run, daemon=True).start()
+        else:
+            TUN.update(state="off", url="")
+            if TUN["proc"]:
+                TUN["proc"].terminate()
+    return jsonify(state=TUN["state"], url=TUN["url"], msg=TUN["msg"])
+
+
+@app.route("/api/shortcut", methods=["POST"])
+def shortcut():  # masaustune kisayol (OneDrive'a tasinmis masaustunu da bulur)
+    if not (is_host() and getattr(sys, "frozen", False)):
+        return jsonify(status="only_exe"), 400
+    ps = ("$d=[Environment]::GetFolderPath('Desktop');"
+          "$s=(New-Object -ComObject WScript.Shell).CreateShortcut(\"$d\\GF Drop.lnk\");"
+          f"$s.TargetPath='{sys.executable}';$s.WorkingDirectory='{Path(sys.executable).parent}';$s.Save()")
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=0x08000000, check=False)
+    return jsonify(status="ok")
 
 
 if __name__ == "__main__":
@@ -242,4 +321,4 @@ if __name__ == "__main__":
         time.sleep(5)
         h = DEVICES.get("host")
         if os.name == "nt" and h and time.time() - h["seen"] > 90:
-            os._exit(0)
+            _quit()
