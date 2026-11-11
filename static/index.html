@@ -32,16 +32,18 @@ h2{font-weight:600;margin-bottom:16px}
 .mut{color:var(--mut);font-size:13px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);margin-right:8px;animation:p 2s infinite}
 .dot.off{background:var(--bad);box-shadow:0 0 10px var(--bad)}@keyframes p{50%{opacity:.4}}
 #qr{background:#fff;border-radius:16px;padding:10px;width:200px;margin:0 auto}#qr svg,#qr img{width:100%;display:block}
+.me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;background:var(--card);border:1px solid var(--line);font-size:13px}.me img{width:36px;height:36px;border-radius:50%}
 .tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;background:var(--card);border:1px solid var(--line)}
 .tag.ok{color:var(--ok)}
 #toast{position:fixed;right:20px;bottom:20px;z-index:9;display:flex;flex-direction:column;gap:8px}
 #toast div{background:rgba(25,27,32,.95);border:1px solid var(--line);padding:12px 18px;border-radius:14px;animation:in .3s}
-@media(max-width:800px){body{flex-direction:column-reverse}aside{width:100%;flex-direction:row;padding:8px;overflow-x:auto;border:0;border-top:1px solid var(--line)}.logo{display:none}nav{display:flex;gap:4px}nav button{white-space:nowrap;padding:10px 12px}main{padding:18px 16px}.grid{grid-template-columns:1fr}}
+@media(max-width:800px){.me{display:none!important}body{flex-direction:column-reverse}aside{width:100%;flex-direction:row;padding:8px;overflow-x:auto;border:0;border-top:1px solid var(--line)}.logo{display:none}nav{display:flex;gap:4px}nav button{white-space:nowrap;padding:10px 12px}main{padding:18px 16px}.grid{grid-template-columns:1fr}}
 </style></head><body>
 <canvas id="fx"></canvas>
 <aside>
  <div class="logo"><img src="/static/logo.png" alt="GF DROP" onerror="this.replaceWith('GF DROP')"></div>
  <nav id="nav"></nav>
+ <div id="me" class="me" style="display:none"></div>
 </aside>
 <main>
 <section id="home" class="on">
@@ -62,7 +64,9 @@ h2{font-weight:600;margin-bottom:16px}
 <section id="settings"><h2 data-t="sets"></h2>
  <div class="card"><b data-t="lang"></b><br><button class="btn g" onclick="setLang('tr')">Türkçe</button><button class="btn g" onclick="setLang('en')">English</button></div>
  <div class="card host"><b data-t="upd"></b> <span class="tag">v<span id="ver"></span></span><p class="mut" id="um" style="margin:8px 0"></p><button class="btn g" onclick="chk()" data-t="chk"></button><button class="btn" id="ub" style="display:none" onclick="applyUpd()" data-t="inst"></button></div>
- <div class="card host"><b>Discord</b> <span class="tag" id="dc"></span><p class="mut" id="dm" style="margin:8px 0"></p><button class="btn g" id="dlog" onclick="location='/auth/discord'" data-t="dlog"></button><button class="btn g" id="dinv" onclick="window.open(INFO.invite)" data-t="dinv"></button></div>
+ <div class="card host"><b>Discord</b> <span class="tag" id="dc"></span><p class="mut" id="dm" style="margin:8px 0"></p><button class="btn g" id="dlog" onclick="location='/auth/discord'" data-t="dlog"></button><div id="dav" style="display:flex;align-items:center;gap:12px;margin:8px 0"></div><button class="btn g" id="dinv" onclick="window.open(INFO.invite)" data-t="dinv"></button><button class="btn g" id="dout" onclick="dlogout()" data-t="dout"></button></div>
+ <div class="card host"><b data-t="net"></b> <span class="tag" id="nt"></span><p class="mut" id="nm" style="margin:8px 0;word-break:break-all"></p><button class="btn g" id="nb" onclick="tun()"></button></div>
+ <div class="card host"><b data-t="sc"></b><p class="mut" data-t="sch" style="margin:8px 0"></p><button class="btn g" onclick="shortcut()" data-t="scb"></button></div>
  <div class="card host"><b data-t="pair"></b><p class="mut" data-t="pairh" style="margin:8px 0"></p><button class="btn g" onclick="repair()" data-t="reset"></button></div>
 </section>
 <section id="about"><h2>GF DROP</h2><div class="card"><p>Transfer Without Limits.</p><p class="mut" data-t="abt"></p></div></section>
@@ -71,6 +75,8 @@ h2{font-weight:600;margin-bottom:16px}
 <script>
 const $=s=>document.querySelector(s),T={tr:{home:"Ana Sayfa",send:"DOSYA GÖNDER",recv:"DOSYA AL",sendf:"Dosya Gönder",recvf:"Dosya Al",devs:"Bağlı Cihazlar",hist:"Aktarım Geçmişi",sets:"Ayarlar",abt:"GF Drop hakkında",drag:"Dosyaları buraya sürükle",choose:"Dosya seç",slogan:"Transfer Without Limits.",qrh:"Telefonla tara, aynı Wi-Fi'de bağlan",openf:"Klasörü aç",lang:"Dil",upd:"Güncelleme",chk:"Güncellemeyi denetle",inst:"İndir ve yükle",dlog:"Discord ile doğrula",dinv:"Sunucuya katıl",pair:"Eşleşme",pairh:"Tüm cihazların eşleşmesini sıfırlar, yeni QR üretir.",reset:"Eşleşmeleri sıfırla",on:"Bağlı",off:"Bağlantı yok",none:"Henüz bir şey yok",ok:"Aktarıldı: ",ver:"Doğrulanmış üye",unv:"Doğrulanmadı",ncfg:"Discord ayarı yok (config.json)",rep:"github_repo ayarlanmamış (config.json)",lat:"Güncelsin",newv:"Yeni sürüm: ",abt:"GF Drop; aynı ağdaki cihazlar arasında dosya aktarır. Dosyalar internete çıkmaz.",nav:["Ana Sayfa","Dosya Gönder","Dosya Al","Bağlı Cihazlar","Geçmiş","Ayarlar","Hakkında"]},
 en:{home:"Home",send:"SEND FILE",recv:"RECEIVE FILE",sendf:"Send Files",recvf:"Receive Files",devs:"Connected Devices",hist:"Transfer History",sets:"Settings",abt:"About GF Drop",drag:"Drag files here",choose:"Choose files",slogan:"Transfer Without Limits.",qrh:"Scan with your phone on the same Wi-Fi",openf:"Open folder",lang:"Language",upd:"Update",chk:"Check for updates",inst:"Download & install",dlog:"Verify with Discord",dinv:"Join server",pair:"Pairing",pairh:"Resets all pairings and creates a new QR.",reset:"Reset pairings",on:"Connected",off:"Disconnected",none:"Nothing yet",ok:"Transferred: ",ver:"Verified member",unv:"Not verified",ncfg:"Discord not configured (config.json)",rep:"github_repo not set (config.json)",lat:"Up to date",newv:"New version: ",abt:"GF Drop moves files between devices on the same network. Files never leave your LAN.",nav:["Home","Send Files","Receive Files","Connected Devices","History","Settings","About"]}};
+Object.assign(T.tr,{qrh:"Telefonla tara ve bağlan",net:"Ağ modu",noff:"Aynı Wi-Fi",nstart:"Başlıyor…",non:"İnternet açık",nerr:"Hata",nh:"Şu an sadece aynı Wi-Fi'deki cihazlar bağlanır. İnternet modu, her ağdan bağlanmanı sağlar (dosya başına en fazla ~100 MB). Adres her açılışta değişir.",nonb:"İnternet modunu aç",noffb:"Kapat",sc:"Kısayol",sch:"Masaüstüne GF Drop kısayolu ekler. Önce exe'yi kalıcı bir klasöre taşı.",scb:"Masaüstüne kısayol ekle",scok:"Kısayol eklendi",sconly:"Sadece exe sürümünde çalışır",dout:"Çıkış yap"});
+Object.assign(T.en,{qrh:"Scan with your phone to connect",net:"Network mode",noff:"Same Wi-Fi",nstart:"Starting…",non:"Internet on",nerr:"Error",nh:"Only devices on the same Wi-Fi can connect right now. Internet mode lets you connect from any network (about 100 MB per file max). The address changes each time.",nonb:"Turn on internet mode",noffb:"Turn off",sc:"Shortcut",sch:"Adds a GF Drop shortcut to your desktop. Move the exe to a permanent folder first.",scb:"Add desktop shortcut",scok:"Shortcut added",sconly:"Only works in the exe version",dout:"Sign out"});
 let L=localStorage.lang||"tr",INFO={},UPD=null;const V=["home","send","receive","devices","history","settings","about"];
 const t=k=>T[L][k]||k,sz=b=>b>1e9?(b/1e9).toFixed(2)+" GB":b>1e6?(b/1e6).toFixed(1)+" MB":(b/1e3|0)+" KB";
 const toast=m=>{const d=document.createElement("div");d.textContent=m;$("#toast").append(d);setTimeout(()=>d.remove(),3500)};
@@ -89,13 +95,25 @@ async function del(b,n){await api(`/api/files/${b}/${encodeURIComponent(n)}`,"DE
 async function loadHist(){const h=await api("/api/history");$("#hl").innerHTML=h.length?h.map(x=>`<div class="row"><span>${{sent:"⬆",received:"⬇",downloaded:"⬇"}[x.dir]}</span><span class="n">${x.name}</span><span class="mut">${x.dev} · ${sz(x.size)}${x.mbs?" · "+x.mbs+" MB/s":""} · ${new Date(x.t*1e3).toLocaleString()}</span></div>`).join(""):`<p class="mut">${t("none")}</p>`}
 async function tick(){try{const r=await api("/api/ping","POST");$("#st").className="dot";$("#stt").textContent=t("on");
  $("#dl").innerHTML=r.devices.length?r.devices.map(d=>`<div class="row"><span style="font-size:24px">${{iPhone:"📱",Android:"📱",Mac:"💻",Windows:"🖥"}[d.type]||"📟"}</span><span class="n">${d.name}</span><span class="tag ${d.online?"ok":""}">${d.online?t("on"):t("off")}</span></div>`).join(""):`<p class="mut">${t("none")}</p>`}catch{$("#st").className="dot off";$("#stt").textContent=t("off")}}
-function dcUI(){const d=INFO.discord||{};$("#dc").textContent=d.verified?"✔ "+t("ver")+" ("+d.user+")":t("unv");$("#dc").className="tag"+(d.verified?" ok":"");$("#dm").textContent=INFO.dc_ready?"":t("ncfg");$("#dlog").style.display=INFO.dc_ready?"":"none";$("#dinv").style.display=INFO.invite?"":"none"}
+function dcUI(){const d=INFO.discord||{},has=!!d.user;
+$("#dc").textContent=d.verified?"✔ "+t("ver"):t("unv");$("#dc").className="tag"+(d.verified?" ok":"");
+$("#dm").textContent=INFO.dc_ready?"":t("ncfg");$("#dlog").style.display=INFO.dc_ready?"":"none";$("#dinv").style.display=INFO.invite?"":"none";$("#dout").style.display=has?"":"none";
+$("#dav").innerHTML=has?`${d.avatar?`<img src="${d.avatar}" style="width:44px;height:44px;border-radius:50%">`:""}<b>${d.user}</b>`:"";
+const me=$("#me");me.style.display=has&&INFO.host?"flex":"none";me.innerHTML=has?`${d.avatar?`<img src="${d.avatar}">`:""}<div><div>${d.user}</div><div class="mut">${d.verified?"✔ "+t("ver"):t("unv")}</div></div>`:""}
+async function dlogout(){await api("/api/discord/logout","POST");INFO=await api("/api/info");dcUI()}
+async function shortcut(){const r=await api("/api/shortcut","POST");toast(r.status=="ok"?t("scok"):t("sconly"))}
+async function tunUI(r){r=r||await api("/api/tunnel");const on=r.state=="on",st=r.state=="starting";
+$("#nt").textContent={off:t("noff"),starting:t("nstart"),on:t("non"),error:t("nerr")}[r.state];$("#nt").className="tag"+(on?" ok":"");
+$("#nm").textContent=on?r.url:r.state=="error"?r.msg:t("nh");$("#nb").textContent=on||st?t("noffb"):t("nonb");$("#nb").dataset.on=on||st?"1":"";
+if(st)setTimeout(()=>tunUI(),2000);if(on||r.state=="off")qr()}
+async function tun(){const r=await api("/api/tunnel","POST",{on:!$("#nb").dataset.on});tunUI(r)}
+async function autoChk(){const r=await api("/api/update/check");if(r.status=="new"){UPD=r;toast(t("newv")+r.latest);$("#um").textContent=t("newv")+r.latest;$("#ub").style.display=""}}
 async function chk(){const r=await api("/api/update/check");UPD=r;$("#um").textContent=r.status=="new"?t("newv")+r.latest:r.status=="no_repo"?t("rep"):r.status=="latest"?t("lat"):r.msg;$("#ub").style.display=r.status=="new"?"":"none"}
-async function applyUpd(){const r=await api("/api/update/apply","POST",{url:UPD.url});if(r.status!="restarting")toast(r.status)}
+async function applyUpd(){toast(t('inst')+"…");const r=await api("/api/update/apply","POST",{url:UPD.url});if(r.status!="restarting")toast(r.status)}
 async function repair(){await api("/api/repair","POST");qr();toast("OK")}
 function qr(){const q=$("#qr");q.innerHTML=INFO.host&&INFO.qr?`<img src="/api/qr?${Date.now()}">`:"";q.style.display=q.innerHTML?"":"none";$("#qrh").style.display=q.innerHTML?"":"none"}
 (async()=>{INFO=await api("/api/info");$("#ver").textContent=INFO.version;if(!INFO.host){$("#ofb").style.display="none";document.querySelectorAll(".host").forEach(e=>e.style.display="none")}
- setLang(L);qr();tick();setInterval(tick,5000)})();
+ setLang(L);qr();tick();if(INFO.host){tunUI();autoChk()}setInterval(tick,5000)})();
 // gumus parcacik animasyonu
 const c=$("#fx"),g=c.getContext("2d");let P=[];function rs(){c.width=innerWidth;c.height=innerHeight;P=Array.from({length:50},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.6+.4,v:Math.random()*.3+.1}))}rs();onresize=rs;
 (function a(){g.clearRect(0,0,c.width,c.height);g.fillStyle="rgba(201,209,220,.35)";for(const p of P){p.y-=p.v;if(p.y<0)p.y=c.height;g.beginPath();g.arc(p.x,p.y,p.r,0,7);g.fill()}requestAnimationFrame(a)})();
