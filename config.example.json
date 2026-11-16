@@ -1,0 +1,6 @@
+{
+  "port": 8765,
+  "github_repo": "kullanici/depo",
+  "require_discord": false,
+  "discord": {"client_id": "", "client_secret": "", "guild_id": "", "invite": ""}
+}

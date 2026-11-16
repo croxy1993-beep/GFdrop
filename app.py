@@ -9,9 +9,9 @@ try:
 except ImportError:
     qrcode = None
 
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))  # paketlenmis dosyalar
-DATA = Path.home() / "GFDrop"
+DATA = Path(os.environ.get("GFDROP_DATA") or Path.home() / "GFDrop")  # GFDROP_DATA: gelistirme/test icin
 BOX = {"inbox": DATA / "inbox", "outbox": DATA / "outbox"}  # inbox: PC'ye gelen, outbox: PC'nin sundugu
 for d in BOX.values():
     d.mkdir(parents=True, exist_ok=True)
@@ -181,7 +181,8 @@ def upd_check():
         return jsonify(status="no_repo")
     try:
         r = requests.get(f"https://api.github.com/repos/{CFG['github_repo']}/releases/latest", timeout=8).json()
-        asset = next((a for a in r.get("assets", []) if a["name"].lower().endswith(".exe")), None)
+        exes = [a for a in r.get("assets", []) if a["name"].lower().endswith(".exe")]
+        asset = next((a for a in exes if "setup" in a["name"].lower()), None) or (exes[0] if exes else None)  # once kurulum paketi
         new = _ver(r["tag_name"]) > _ver(VERSION)
         return jsonify(status="new" if new and asset else "latest", latest=r["tag_name"], url=asset and asset["browser_download_url"])
     except Exception as e:
@@ -195,6 +196,11 @@ def upd_apply():
     url = request.json.get("url", "")
     if not url.startswith("https://github.com/" + CFG["github_repo"]):
         abort(400)
+    if "setup" in url.rsplit("/", 1)[-1].lower():  # kurulum paketi: sessiz kur, kurulum eskiyi kapatip yenisini acar
+        st = DATA / "GFDrop-Setup.exe"
+        st.write_bytes(requests.get(url, timeout=300).content)
+        subprocess.Popen([str(st), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], creationflags=0x00000008)
+        return jsonify(status="restarting")
     new, cur = DATA / "GFDrop_new.exe", sys.executable
     new.write_bytes(requests.get(url, timeout=120).content)
     bat = DATA / "upd.bat"  # eski exe kapaninca yenisiyle degistir, yeniden baslat
@@ -307,18 +313,58 @@ def shortcut():  # masaustune kisayol (OneDrive'a tasinmis masaustunu da bulur)
     return jsonify(status="ok")
 
 
-if __name__ == "__main__":
-    port = CFG["port"]
-    threading.Thread(target=lambda: app.run("0.0.0.0", port, threaded=True), daemon=True).start()
-    time.sleep(1)
-    url = f"http://127.0.0.1:{port}"
+# ---- arka plan / baslangic ----
+RUNKEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+@app.route("/api/autostart", methods=["GET", "POST"])
+def autostart():  # Windows ile birlikte arka planda baslat (kayit defteri Run anahtari)
+    if not (is_host() and os.name == "nt" and getattr(sys, "frozen", False)):
+        return jsonify(supported=False, on=False)
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUNKEY, 0, winreg.KEY_ALL_ACCESS) as k:
+        if request.method == "POST":
+            if request.json.get("on"):
+                winreg.SetValueEx(k, "GFDrop", 0, winreg.REG_SZ, f'"{sys.executable}" --background')
+            else:
+                try:
+                    winreg.DeleteValue(k, "GFDrop")
+                except FileNotFoundError:
+                    pass
+        try:
+            winreg.QueryValueEx(k, "GFDrop"); on = True
+        except FileNotFoundError:
+            on = False
+    return jsonify(supported=True, on=on)
+
+
+@app.route("/api/quit", methods=["POST"])
+def quit_app():
+    if not is_host():
+        abort(403)
+    threading.Timer(0.3, _quit).start()
+    return jsonify(ok=True)
+
+
+def open_window(url):
     edge = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
     if os.name == "nt" and os.path.exists(edge):
         subprocess.Popen([edge, f"--app={url}", "--window-size=1200,780"])  # uygulama penceresi
     else:
         webbrowser.open(url)
-    while True:  # Edge uygulama penceresi kapaninca (90 sn ping yok) programdan cik
-        time.sleep(5)
-        h = DEVICES.get("host")
-        if os.name == "nt" and h and time.time() - h["seen"] > 90:
-            _quit()
+
+
+if __name__ == "__main__":
+    port, bg = CFG["port"], "--background" in sys.argv   # --background: pencere acmadan sadece sunucu
+    url = f"http://127.0.0.1:{port}"
+    with socket.socket() as probe:  # zaten calisiyorsa ikinci sunucu acma, sadece pencereyi ac
+        if probe.connect_ex(("127.0.0.1", port)) == 0:
+            if not bg:
+                open_window(url)
+            sys.exit(0)
+    threading.Thread(target=lambda: app.run("0.0.0.0", port, threaded=True), daemon=True).start()
+    time.sleep(1)
+    if not bg:
+        open_window(url)
+    while True:  # pencere kapansa da arka planda calisir; kapatmak icin Ayarlar > Tamamen kapat
+        time.sleep(3600)
